@@ -4,11 +4,12 @@ from dotenv import load_dotenv
 import os
 import logging
 import random
+import asyncio
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import PyPDFLoader
+from langchain.chains import RetrievalQA
 
 # Importing necessary components of the chatbot
 from chatbot_tone import generate_persona, CUSTOM_PROMPT
@@ -90,21 +91,24 @@ if 'conversation_id' not in st.session_state:
 
 # Function to initialize RAG system
 def initialize_rag():
-    pdf_path = "Knowledgebase.pdf"
-    pdf_loader = PyPDFLoader(pdf_path)
-    pages = pdf_loader.load_and_split()
+    async def init_async_rag():
+        pdf_path = "Knowledgebase.pdf"
+        pdf_loader = PyPDFLoader(pdf_path)
+        pages = pdf_loader.load_and_split()
     
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=800)
-    context = "\n\n".join(str(p.page_content) for p in pages)
-    texts = text_splitter.split_text(context)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=800)
+        context = "\n\n".join(str(p.page_content) for p in pages)
+        texts = text_splitter.split_text(context)
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=GOOGLE_API_KEY)
-    vector_index = Chroma.from_texts(texts, embeddings).as_retriever(search_kwargs={"k": 5})
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=GOOGLE_API_KEY)
+        vector_index = Chroma.from_texts(texts, embeddings).as_retriever(search_kwargs={"k": 5})
     
-    model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.3)
-    qa_chain = RetrievalQA.from_chain_type(model, retriever=vector_index, return_source_documents=True)
+        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.3)
+        qa_chain = RetrievalQA.from_chain_type(model, retriever=vector_index, return_source_documents=True)
     
-    return qa_chain
+        return qa_chain
+    
+    return asyncio.run(init_async_rag())
 
 # Session state for RAG system
 if "rag_system" not in st.session_state:

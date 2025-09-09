@@ -4,6 +4,7 @@
 # Virtual environment
 .venv/
 venv/
+.virtualfiles/
 ENV/
 
 # Python
